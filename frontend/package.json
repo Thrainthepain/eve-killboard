@@ -1,0 +1,130 @@
+// Frontend: React App Scaffold
+// Located in project-root/frontend/
+
+// 1. package.json (frontend/package.json)
+{
+  "name": "eve-report-frontend",
+  "version": "0.1.0",
+  "private": true,
+  "dependencies": {
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "react-router-dom": "^6.4.0",
+    "axios": "^1.4.0"
+  },
+  "scripts": {
+    "start": "react-scripts start",
+    "build": "react-scripts build",
+    "test": "react-scripts test",
+    "lint": "eslint . --ext .js,.jsx"
+  }
+}
+
+// 2. public/index.html (frontend/public/index.html)
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>EVE Report Generator</title>
+</head>
+<body>
+  <div id="root"></div>
+</body>
+</html>
+
+// 3. src/index.js (frontend/src/index.js)
+import React from 'react';
+import { createRoot } from 'react-dom/client';
+import { BrowserRouter } from 'react-router-dom';
+import App from './App';
+
+const container = document.getElementById('root');
+const root = createRoot(container);
+root.render(
+  <BrowserRouter>
+    <App />
+  </BrowserRouter>
+);
+
+// 4. src/App.js (frontend/src/App.js)
+import React, { useEffect, useState } from 'react';
+import { Routes, Route, Link } from 'react-router-dom';
+import axios from 'axios';
+import Dashboard from './pages/Dashboard';
+import Login from './pages/Login';
+
+function App() {
+  const [auth, setAuth] = useState({ isLoggedIn: false, user: null });
+
+  useEffect(() => {
+    axios.get(`${process.env.REACT_APP_API_BASE}/api/auth/status`, { withCredentials: true })
+      .then(res => setAuth(res.data))
+      .catch(() => setAuth({ isLoggedIn: false }));
+  }, []);
+
+  return (
+    <div>
+      <nav>
+        <Link to="/">Home</Link> |
+        {auth.isLoggedIn ? <Link to="/dashboard">Dashboard</Link> : <Link to="/login">Login</Link>}
+      </nav>
+      <Routes>
+        <Route path="/" element={<h1>Welcome to EVE Report Generator</h1>} />
+        <Route path="/login" element={<Login />} />
+        <Route path="/dashboard" element={<Dashboard auth={auth} />} />
+      </Routes>
+    </div>
+  );
+}
+
+export default App;
+
+// 5. src/pages/Login.js (frontend/src/pages/Login.js)
+import React from 'react';
+
+function Login() {
+  const handleLogin = () => {
+    window.location.href = `${process.env.REACT_APP_API_BASE}/auth/eve/login`;
+  };
+
+  return (
+    <div>
+      <h2>Login with EVE SSO</h2>
+      <button onClick={handleLogin}>Login</button>
+    </div>
+  );
+}
+
+export default Login;
+
+// 6. src/pages/Dashboard.js (frontend/src/pages/Dashboard.js)
+import React, { useEffect, useState } from 'react';
+import axios from 'axios';
+
+function Dashboard({ auth }) {
+  const [profile, setProfile] = useState(null);
+
+  useEffect(() => {
+    if (auth.isLoggedIn) {
+      axios.get(`${process.env.REACT_APP_API_BASE}/api/user/profile`, { withCredentials: true })
+        .then(res => setProfile(res.data));
+    }
+  }, [auth]);
+
+  if (!auth.isLoggedIn) return <p>Please log in first.</p>;
+  if (!profile) return <p>Loading profile�</p>;
+
+  return (
+    <div>
+      <h2>Welcome, {profile.characterName}</h2>
+      <p>Corporation: {profile.corporationName}</p>
+      <p>Alliance: {profile.allianceName}</p>
+    </div>
+  );
+}
+
+export default Dashboard;
+
+// 7. Environment variables (.env)
+REACT_APP_API_BASE=http://localhost:5000

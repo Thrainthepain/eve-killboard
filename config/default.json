@@ -1,0 +1,27 @@
+// config/default.json
+{
+  "server": {
+    "port": 5000,
+    "sessionSecret": "dev-secret",
+    "frontendUrl": "http://localhost:3000"
+  },
+  "eve": {
+    "clientId": null,
+    "secretKey": null,
+    "callbackUrl": null
+  }
+}
+
+// config/custom-environment-variables.json
+{
+  "server": {
+    "port": "PORT",
+    "sessionSecret": "SESSION_SECRET",
+    "frontendUrl": "FRONTEND_URL"
+  },
+  "eve": {
+    "clientId": "EVE_CLIENT_ID",
+    "secretKey": "EVE_SECRET_KEY",
+    "callbackUrl": "EVE_CALLBACK_URL"
+  }
+}

@@ -1,0 +1,35 @@
+project-root/
+│
+├── frontend/                   # React app
+│   ├── public/
+│   │   └── index.html
+│   ├── src/
+│   │   ├── index.js
+│   │   ├── App.js
+│   │   └── pages/
+│   │       ├── Login.js
+│   │       └── Dashboard.js
+│   └── package.json
+│
+├── config/                     # Config & env templates
+│   ├── default.json
+│   ├── custom-environment-variables.json
+│   └── .env.example
+│
+├── routes/                     # Express route handlers
+│   ├── auth.js
+│   ├── user.js
+│   └── reports.js
+│
+├── services/                   # Business logic & API integrations
+│   ├── esiService.js
+│   ├── zkbService.js
+│   └── reportProcessorService.js
+│
+├── middleware/                 # Custom Express middleware
+│   └── authMiddleware.js
+│
+├── server.js                   # Main backend entrypoint
+├── package.json                # Backend dependencies & scripts
+├── .gitignore
+└── README.md                   # (optional) project overview, setup instructions

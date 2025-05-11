@@ -1,0 +1,873 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EVE Online Smart Report Generator (Backend Ready)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; background-color: #1a202c; color: #e2e8f0; }
+        .panel { background-color: #2d3748; padding: 1.5rem; border-radius: 0.5rem; margin-bottom: 1rem; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -2px rgba(0,0,0,0.05); }
+        @media (min-width: 768px) { .panel { padding: 2rem; } }
+
+        .form-input, .form-textarea, .form-select { background-color: #4a5568; color: #e2e8f0; border: 1px solid #718096; border-radius: 0.375rem; padding: 0.75rem 1rem; width: 100%; transition: border-color 0.3s; }
+        .form-input:focus, .form-textarea:focus, .form-select:focus { outline: none; border-color: #63b3ed; box-shadow: 0 0 0 3px rgba(99,179,237,0.5); }
+        .form-label { display: block; margin-bottom: 0.5rem; font-weight: 600; color: #a0aec0; }
+        .btn { padding: 0.75rem 1.5rem; border-radius: 0.375rem; font-weight: 600; transition: background-color 0.3s, transform 0.1s; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; }
+        .btn-sm { padding: 0.375rem 0.75rem; font-size: 0.875rem; }
+        .btn-primary { background-color: #4299e1; color: white; }
+        .btn-primary:hover { background-color: #3182ce; }
+        .btn-primary:disabled { background-color: #2c5282; cursor: not-allowed; opacity: 0.7; }
+        .btn-secondary { background-color: #4a5568; color: #e2e8f0; border: 1px solid #718096; }
+        .btn-secondary:hover { background-color: #2d3748; }
+        .btn-danger { background-color: #c53030; color: white; }
+        .btn-danger:hover { background-color: #9b2c2c; }
+        .btn:active { transform: translateY(1px); }
+        
+        /* Generated Report Output Styling */
+        .report-output-content { background-color: #1A202C; padding: 1.5rem; border-radius: 0.375rem; border: 1px solid #4a5568; max-height: 75vh; overflow-y: auto; }
+        .report-output-content h3 { font-size: 1.25rem; font-weight: 700; color: #63b3ed; margin-top: 1.5rem; margin-bottom: 0.75rem; padding-bottom: 0.5rem; border-bottom: 2px solid #4a5568; }
+        .report-output-content h3:first-of-type { margin-top: 0.5rem; }
+        .report-output-content .section-friendly h3 { color: #48bb78; border-bottom-color: #38a169; }
+        .report-output-content .section-enemy h3 { color: #f56565; border-bottom-color: #c53030; }
+        .report-output-content .section-neutral h3 { color: #ecc94b; border-bottom-color: #d69e2e; }
+        .report-output-content p { margin-bottom: 0.5rem; line-height: 1.6; color: #cbd5e0; }
+        .report-output-content strong { color: #a0aec0; font-weight: 600; }
+        .report-output-content ul { list-style-type: none; padding-left: 0; margin-bottom: 1rem; }
+        
+        .report-output-content .ship-loss-item { 
+            display: grid; 
+            grid-template-columns: 32px 1fr auto; 
+            grid-template-areas: 
+                "icon main-info status"
+                "icon damage-info isk"; 
+            align-items: center; 
+            gap: 0.5rem 0.75rem; 
+            margin-bottom: 0.75rem; 
+            padding: 0.75rem; 
+            border-radius: 0.375rem; 
+            border: 1px solid #2d3748; 
+            transition: background-color 0.2s;
+        }
+        .report-output-content .ship-loss-item:hover { background-color: #2d3748; }
+        .report-output-content .ship-icon { grid-area: icon; width: 32px; height: 32px; background-color: #718096; border-radius: 0.25rem; display: inline-block; flex-shrink: 0; }
+        .report-output-content .ship-main-info { grid-area: main-info; display: flex; flex-direction: column; }
+        .report-output-content .ship-name-link { font-weight: 600; color: #63b3ed; text-decoration: none; }
+        .report-output-content .ship-name-link:hover { text-decoration: underline; }
+        .report-output-content .pilot-name { font-size: 0.875rem; color: #a0aec0; }
+        .report-output-content .damage-info { grid-area: damage-info; font-size: 0.75rem; color: #a0aec0; display: flex; gap: 0.5rem; margin-top: -0.25rem; }
+        .report-output-content .isk-lost { grid-area: isk; font-size: 0.875rem; font-weight: 500; text-align: right; }
+        .report-output-content .isk-lost.destroyed { color: #e53e3e; } 
+        .report-output-content .isk-lost.survived { color: #a0aec0; } 
+        .report-output-content .status-text { grid-area: status; font-size: 0.875rem; font-weight: 600; text-align: right; }
+        .report-output-content .status-destroyed { color: #e53e3e; } 
+        .report-output-content .status-survived { color: #48bb78; } 
+
+
+        .report-output-content .battle-stats { background-color: #2d3748; padding: 1rem; border-radius: 0.375rem; margin-bottom: 1.5rem; }
+        .report-output-content .battle-stats p { font-size: 1.125rem; margin-bottom: 0.25rem; }
+        .report-output-content .battle-stats strong { color: #63b3ed; }
+        .forces-container { display: flex; flex-direction: column; gap: 1.5rem; } 
+        @media (min-width: 768px) { 
+            .forces-container { flex-direction: row; }
+            .forces-container > div { flex: 1; } 
+        }
+
+        #copyNotification, #errorNotification { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); color: white; padding: 10px 20px; border-radius: 5px; box-shadow: 0 2px 10px rgba(0,0,0,0.2); z-index: 1000; opacity: 0; transition: opacity 0.5s ease-in-out; }
+        #copyNotification { background-color: #38a169; }
+        #errorNotification { background-color: #c53030; }
+        #copyNotification.show, #errorNotification.show { opacity: 1; }
+        .loader { border: 3px solid #718096; border-top: 3px solid #63b3ed; border-radius: 50%; width: 20px; height: 20px; animation: spin 1s linear infinite; display: inline-block; margin-left: 8px; vertical-align: middle; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        .killmail-item { padding: 0.75rem; border: 1px solid #4A5568; border-radius: 0.375rem; margin-bottom: 0.5rem; cursor: pointer; transition: background-color 0.2s, border-color 0.2s; }
+        .killmail-item:hover { background-color: #4A5568; }
+        .killmail-item.selected { background-color: #3182CE; border-color: #63B3ED; color: white; }
+        .killmail-item strong { color: #E2E8F0; }
+        .killmail-item .text-xs { color: #A0AEC0; }
+        .killmail-item.selected .text-xs { color: #CBD5E0; }
+        .divider-text { display: flex; align-items: center; text-align: center; color: #a0aec0; margin: 1rem 0; }
+        .divider-text::before, .divider-text::after { content: ''; flex: 1; border-bottom: 1px solid #4a5568; }
+        .divider-text:not(:empty)::before { margin-right: .25em; }
+        .divider-text:not(:empty)::after { margin-left: .25em; }
+        
+        .report-summary-card { background-color: #2d3748; border: 1px solid #4a5568; padding: 1.25rem; border-radius: 0.5rem; margin-bottom: 1rem; transition: transform 0.2s ease-out, box-shadow 0.2s ease-out; display: flex; flex-direction: column; justify-content: space-between; }
+        .report-summary-card:hover { transform: translateY(-3px); box-shadow: 0 6px 15px rgba(0,0,0,0.25); }
+        .report-summary-card h4 { color: #63b3ed; font-size: 1.125rem; font-weight: 600; margin-bottom: 0.5rem; }
+        .report-summary-card p { font-size: 0.875rem; color: #a0aec0; margin-bottom: 0.25rem; line-height: 1.5; }
+        .report-summary-card .summary-value { font-weight: 600; color: #e2e8f0; }
+        .report-summary-card .summary-footer { margin-top: 0.75rem; border-top: 1px solid #4a5568; padding-top: 0.75rem; }
+        .report-summary-card .summary-footer a { color: #e2e8f0; text-decoration: none; font-size: 0.875rem; font-weight: 500; background-color: #4299e1; padding: 0.375rem 0.75rem; border-radius: 0.25rem; transition: background-color 0.2s; cursor: pointer; } 
+        .report-summary-card .summary-footer a:hover { background-color: #3182ce; }
+
+        /* Kill Activity Item Styling */
+        .kill-activity-item { background-color: #4a5568; border: 1px solid #718096; padding: 1rem; border-radius: 0.375rem; margin-bottom: 0.75rem; display: grid; grid-template-columns: auto 1fr; gap: 0.5rem 1rem; align-items: center; }
+        .kill-activity-item.user-loss { border-left: 4px solid #e53e3e; } 
+        .kill-activity-item.user-kill { border-left: 4px solid #48bb78; } 
+        .kill-activity-item .ship-icon-large { width: 48px; height: 48px; background-color: #718096; border-radius: 0.25rem; }
+        .kill-activity-item-details p { margin-bottom: 0.125rem; font-size: 0.875rem; }
+        .kill-activity-item-details strong { color: #e2e8f0; }
+        .kill-activity-item-details .victim { color: #f56565; }
+        .kill-activity-item-details .aggressor { color: #48bb78; }
+        .kill-activity-item-actions a { font-size: 0.875rem; color: #63b3ed; text-decoration: underline; }
+        .kill-activity-item-actions a:hover { color: #90cdf4; }
+    </style>
+</head>
+<body class="p-4 md:p-8">
+    <header class="text-center mb-8">
+        <h1 class="text-3xl md:text-4xl font-bold text-blue-400">EVE Online Smart Report Generator</h1>
+        <p class="text-md md:text-lg text-gray-400">Log in or enter details manually to create battle reports.</p>
+    </header>
+
+    <main class="max-w-5xl mx-auto"> 
+        <div id="userPanel" class="panel"> 
+            <div id="initialOptionsView" class="hidden"> 
+                <p class="mb-4 text-center">Log in with EVE Online for personalized report options or enter details manually.</p>
+                <div class="flex flex-col sm:flex-row gap-4 justify-center">
+                    <button id="loginBtn" class="btn btn-primary w-full sm:w-auto">Login with EVE Online (Simulated) <span id="loginSpinner" class="loader hidden"></span></button>
+                    <button id="skipLoginBtn" class="btn btn-secondary w-full sm:w-auto">Skip Login & Enter Manually</button>
+                </div>
+            </div>
+            <div id="loggedInView" class="hidden">
+                <div class="flex flex-col md:flex-row md:justify-between md:items-center">
+                    <div class="mb-4 md:mb-0">
+                        <p class="text-sm">Logged in as: <strong id="characterName" class="text-blue-300">Character Name</strong></p>
+                        <p class="text-xs">Corporation: <span id="corporationName" class="text-gray-300">Corp Name</span></p>
+                        <p class="text-xs">Alliance: <span id="allianceName" class="text-gray-300">Alliance Name</span></p>
+                    </div>
+                    <button id="logoutBtn" class="btn btn-danger w-full md:w-auto">Logout</button>
+                </div>
+            </div>
+        </div>
+
+        <div id="navigationPanel" class="panel hidden">
+            <nav class="flex flex-wrap gap-2 justify-center">
+                <button id="navDashboardBtn" class="btn btn-sm btn-secondary">Dashboard</button>
+                <button id="navCreateSsoBtn" class="btn btn-sm btn-secondary">Create Report (SSO Data)</button>
+                <button id="navCreateManualBtn" class="btn btn-sm btn-secondary">Create Report (Manual)</button>
+                <button id="navKillActivityBtn" class="btn btn-sm btn-secondary">My Kill Activity</button>
+            </nav>
+        </div>
+
+
+        <div id="recentReportsSection" class="panel hidden">
+            <h3 class="text-xl md:text-2xl font-bold mb-6 text-center text-blue-300">Recent Public Reports</h3>
+            <div id="recentReportsListContainer" class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <p class="text-gray-400 md:col-span-2 text-center">No public reports available. (Backend would populate this)</p>
+            </div>
+        </div>
+        
+        <div id="killActivitySection" class="panel hidden">
+            <h3 class="text-xl md:text-2xl font-bold mb-6 text-center text-blue-300">My Recent Kill Activity</h3>
+            <div id="killActivityList">
+                <p class="text-gray-400 text-center">Loading kill activity... (Backend would populate this)</p>
+            </div>
+        </div>
+
+
+        <div id="reportFormSection" class="panel hidden">
+            <h2 id="formTitle" class="text-xl md:text-2xl font-bold mb-6 text-blue-300">Create New Report</h2>
+            <form id="reportForm" class="space-y-6">
+                <div>
+                    <label for="reportTitle" class="form-label">Report Title / Operation Name:</label>
+                    <input type="text" id="reportTitle" name="reportTitle" class="form-input" placeholder="e.g., M-OEE8 Keepstar Defense" required>
+                </div>
+
+                <div id="ssoDataSourceSection">
+                    <label for="dataSource" class="form-label">Data Source (SSO):</label>
+                    <select id="dataSource" name="dataSource" class="form-select">
+                        <option value="recent_killmails">My Recent Involvements (from ESI)</option>
+                        <option value="zkb_url_sso">zKillboard URL (Contextualized with SSO)</option>
+                    </select>
+                    <div id="recentKillmailsSsoListSection" class="mt-2"> 
+                        <label class="form-label text-sm">Select an Engagement:</label>
+                        <div id="recentKillmailsSsoList" class="max-h-60 overflow-y-auto p-2 bg-gray-900 rounded-md border border-gray-700">
+                            <p class="text-gray-400 p-2">Loading your recent involvements... (Backend would populate this)</p>
+                        </div>
+                        <input type="hidden" id="selectedKillmailId" name="selectedKillmailId">
+                    </div>
+                    <div id="zkbUrlSsoSection" class="mt-2 hidden">
+                        <label for="zkillUrlSso" class="form-label text-sm">zKillboard Battle Report URL:</label>
+                        <input type="url" id="zkillUrlSso" name="zkillUrlSso" class="form-input form-input-sm" placeholder="https://zkillboard.com/related/...">
+                    </div>
+                </div>
+
+                <div id="manualEntrySection" class="space-y-6 hidden">
+                     <div class="divider-text text-sm">Manual Engagement Details</div>
+                    <div>
+                        <label for="manualSystem" class="form-label">System(s) Involved:</label>
+                        <input type="text" id="manualSystem" name="manualSystem" class="form-input" placeholder="e.g., Jita, M-OEE8, Perimeter (comma-separated)">
+                    </div>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                        <div>
+                            <label for="manualDate" class="form-label">Date of Engagement:</label>
+                            <input type="date" id="manualDate" name="manualDate" class="form-input">
+                        </div>
+                        <div>
+                            <label for="manualTime" class="form-label">Time (EVE Time / UTC):</label>
+                            <input type="time" id="manualTime" name="manualTime" class="form-input">
+                        </div>
+                    </div>
+                    <div>
+                        <label for="manualZkillUrl" class="form-label">Optional: zKillboard Link (Battle Report or Single Kill):</label>
+                        <input type="url" id="manualZkillUrl" name="manualZkillUrl" class="form-input" placeholder="Enhances data accuracy if available">
+                        <p class="text-xs text-gray-400 mt-1">If provided, this link will be the primary data source. System/Date/Time above will be for context.</p>
+                    </div>
+                </div>
+                
+                <div>
+                    <label for="reportNarrative" class="form-label">Overall Narrative / Summary (Optional):</label>
+                    <textarea id="reportNarrative" name="reportNarrative" rows="3" class="form-textarea" placeholder="Add context, objectives, or strategic insights."></textarea>
+                </div>
+
+                <div class="flex flex-col sm:flex-row sm:gap-4 pt-6 border-t border-gray-700">
+                    <button type="button" id="generateReportBtn" class="btn btn-primary w-full sm:w-auto mb-2 sm:mb-0">
+                        Generate Smart Report
+                        <span id="generateSpinner" class="loader hidden"></span>
+                    </button>
+                    <button type="reset" id="resetFormBtn" class="btn btn-secondary w-full sm:w-auto">Clear Form</button>
+                </div>
+            </form>
+        </div>
+
+        <div id="reportOutputContainer" class="panel mt-8 hidden">
+            <div class="flex flex-col sm:flex-row justify-between items-center mb-4">
+                <h2 id="reportOutputTitle" class="text-xl md:text-2xl font-bold text-blue-300 mb-2 sm:mb-0">Generated Report</h2>
+                <div>
+                    <button id="dashboardBtnInOutput" class="btn btn-sm btn-secondary text-xs py-1 px-2 mr-2 hidden">Dashboard</button> 
+                    <button id="copyReportBtn" class="btn btn-secondary btn-sm text-xs py-1 px-2">Copy to Clipboard</button>
+                </div>
+            </div>
+            <div id="reportOutput" class="report-output-content"></div> 
+        </div>
+    </main>
+
+    <footer class="text-center mt-12 mb-6 px-4">
+        <p class="text-sm text-gray-500">© <span id="currentYear"></span> EVE Smart Report Generator. Fly safe, capsuleer!</p>
+        <p class="text-xs text-gray-600">This is a conceptual frontend demonstration. Full EVE Online SSO integration and advanced data parsing require a secure backend server.</p>
+    </footer>
+
+    <div id="copyNotification">Report copied to clipboard!</div>
+    <div id="errorNotification">Error message here.</div>
+
+    <script>
+    document.addEventListener('DOMContentLoaded', () => {
+        // --- DOM Elements ---
+        const userPanel = document.getElementById('userPanel');
+        const initialOptionsView = document.getElementById('initialOptionsView');
+        const loginBtn = document.getElementById('loginBtn');
+        const loginSpinner = document.getElementById('loginSpinner');
+        const skipLoginBtn = document.getElementById('skipLoginBtn');
+        
+        const loggedInView = document.getElementById('loggedInView');
+        const characterNameEl = document.getElementById('characterName');
+        const corporationNameEl = document.getElementById('corporationName');
+        const allianceNameEl = document.getElementById('allianceName');
+        const logoutBtn = document.getElementById('logoutBtn');
+
+        const navigationPanel = document.getElementById('navigationPanel');
+        const navDashboardBtn = document.getElementById('navDashboardBtn');
+        const navCreateSsoBtn = document.getElementById('navCreateSsoBtn');
+        const navCreateManualBtn = document.getElementById('navCreateManualBtn');
+        const navKillActivityBtn = document.getElementById('navKillActivityBtn');
+        
+        const recentReportsSection = document.getElementById('recentReportsSection');
+        const recentReportsListContainerEl = document.getElementById('recentReportsListContainer'); 
+
+        const killActivitySection = document.getElementById('killActivitySection');
+        const killActivityListEl = document.getElementById('killActivityList');
+
+        const reportFormSection = document.getElementById('reportFormSection');
+        const formTitle = document.getElementById('formTitle'); 
+        
+        const reportOutputContainer = document.getElementById('reportOutputContainer');
+        const reportOutputTitle = document.getElementById('reportOutputTitle'); 
+        const dashboardBtnInOutput = document.getElementById('dashboardBtnInOutput'); 
+        const reportOutputEl = document.getElementById('reportOutput'); 
+        const copyReportBtn = document.getElementById('copyReportBtn');
+
+
+        const reportForm = document.getElementById('reportForm');
+        const reportTitleInput = document.getElementById('reportTitle');
+        
+        const ssoDataSourceSection = document.getElementById('ssoDataSourceSection');
+        const dataSourceSelect = document.getElementById('dataSource'); 
+        const recentKillmailsSsoListSectionEl = document.getElementById('recentKillmailsSsoListSection'); 
+        const recentKillmailsSsoListEl = document.getElementById('recentKillmailsSsoList');
+        const selectedKillmailIdInput = document.getElementById('selectedKillmailId');
+        const zkbUrlSsoSection = document.getElementById('zkbUrlSsoSection');
+        const zkillUrlSsoInput = document.getElementById('zkillUrlSso');
+
+        const manualEntrySection = document.getElementById('manualEntrySection');
+        const manualSystemInput = document.getElementById('manualSystem');
+        const manualDateInput = document.getElementById('manualDate');
+        const manualTimeInput = document.getElementById('manualTime');
+        const manualZkillUrlInput = document.getElementById('manualZkillUrl');
+        
+        const reportNarrativeInput = document.getElementById('reportNarrative');
+        const generateReportBtn = document.getElementById('generateReportBtn');
+        const generateSpinner = document.getElementById('generateSpinner');
+        const resetFormBtn = document.getElementById('resetFormBtn');
+        
+        const copyNotification = document.getElementById('copyNotification');
+        const errorNotification = document.getElementById('errorNotification');
+        if(document.getElementById('currentYear')) { 
+            document.getElementById('currentYear').textContent = new Date().getFullYear();
+        }
+
+
+        // --- Application State (Simulated) ---
+        let currentMode = 'initial'; 
+        let isLoggedIn = false;
+        let mockUserData = null; // To store { characterName, corporationName, allianceName, characterId }
+        // Removed mockSsoRecentInvolvements, mockUserKillActivity, mockPublicReports
+        // These will now be fetched or handled as empty/loading states.
+
+        // --- Helper Functions ---
+        function showUINotification(element, message, duration = 3000) {
+            if (!element) return;
+            element.textContent = message;
+            element.classList.add('show');
+            setTimeout(() => element.classList.remove('show'), duration);
+        }
+
+        function formatISKValue(value) {
+            if (value === undefined || value === null || isNaN(parseFloat(value))) return "0.00 ISK";
+            return parseFloat(value).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + " ISK";
+        }
+        function formatDamage(value) {
+            if (value === undefined || value === null || isNaN(parseFloat(value))) return "0";
+            return parseFloat(value).toLocaleString('en-US');
+        }
+
+        // --- UI Update Functions ---
+        function updateUIForMode() {
+            initialOptionsView.classList.add('hidden');
+            loggedInView.classList.add('hidden');
+            navigationPanel.classList.add('hidden'); 
+
+            if (isLoggedIn) {
+                loggedInView.classList.remove('hidden');
+                navigationPanel.classList.remove('hidden'); 
+                if (mockUserData) {
+                    characterNameEl.textContent = mockUserData.characterName;
+                    corporationNameEl.textContent = mockUserData.corporationName;
+                    allianceNameEl.textContent = mockUserData.allianceName || 'N/A';
+                }
+            } else {
+                initialOptionsView.classList.remove('hidden');
+            }
+            
+            recentReportsSection.classList.add('hidden');
+            killActivitySection.classList.add('hidden');
+            reportFormSection.classList.add('hidden');
+            reportOutputContainer.classList.add('hidden');
+            dashboardBtnInOutput.classList.add('hidden'); 
+
+            ssoDataSourceSection.classList.add('hidden');
+            manualEntrySection.classList.add('hidden');
+
+            if (currentMode === 'initial') {
+                recentReportsSection.classList.remove('hidden');
+                displayPublicReports(); // Will show "No reports" or "Loading"
+            } else if (currentMode === 'sso') {
+                reportFormSection.classList.remove('hidden');
+                ssoDataSourceSection.classList.remove('hidden');
+                formTitle.textContent = "Create Report (SSO Data)";
+                toggleSsoDataSourceView();
+                displaySsoRecentInvolvements(); // Will show "No involvements" or "Loading"
+            } else if (currentMode === 'manual') {
+                reportFormSection.classList.remove('hidden');
+                manualEntrySection.classList.remove('hidden');
+                formTitle.textContent = "Create Report (Manual Entry)";
+                if (!manualDateInput.value) manualDateInput.value = new Date().toISOString().split('T')[0];
+                if (!manualTimeInput.value) {
+                    const now = new Date();
+                    manualTimeInput.value = `${String(now.getUTCHours()).padStart(2, '0')}:${String(now.getUTCMinutes()).padStart(2, '0')}`;
+                }
+            } else if (currentMode === 'kill_activity') {
+                killActivitySection.classList.remove('hidden');
+                displayUserKillActivity(); // Will show "No activity" or "Loading"
+            } else if (currentMode === 'viewing_public_report') {
+                reportOutputContainer.classList.remove('hidden');
+                reportOutputTitle.textContent = "Viewing Public Report";
+                dashboardBtnInOutput.classList.remove('hidden'); 
+            }
+        }
+        
+        function toggleSsoDataSourceView() {
+            if (!ssoDataSourceSection.classList.contains('hidden')) { 
+                if (dataSourceSelect.value === 'recent_killmails') {
+                    recentKillmailsSsoListSectionEl.classList.remove('hidden'); 
+                    zkbUrlSsoSection.classList.add('hidden');
+                    if(zkillUrlSsoInput) zkillUrlSsoInput.required = false;
+                } else { 
+                    recentKillmailsSsoListSectionEl.classList.add('hidden'); 
+                    zkbUrlSsoSection.classList.remove('hidden');
+                    if(zkillUrlSsoInput) zkillUrlSsoInput.required = true;
+                }
+            }
+        }
+
+        // --- Display Functions for Report Lists ---
+        async function displayPublicReports() { // Now async to simulate fetch
+            recentReportsListContainerEl.innerHTML = '<p class="text-gray-400 md:col-span-2 text-center">Loading recent public reports...</p>';
+            // In a real app, fetch public reports from backend API
+            // const publicReports = await fetch('/api/public-reports'); 
+            const publicReports = []; // Simulate empty or loading state
+            
+            recentReportsListContainerEl.innerHTML = ''; 
+            if (publicReports.length === 0) {
+                recentReportsListContainerEl.innerHTML = '<p class="text-gray-400 md:col-span-2 text-center">No public reports available currently. (Backend would populate this)</p>';
+                return;
+            }
+            // ... (rendering logic would go here if data was fetched)
+        }
+
+        async function displaySsoRecentInvolvements() { // Now async
+            recentKillmailsSsoListEl.innerHTML = '<p class="text-gray-400 p-2">Loading your recent involvements...</p>';
+            // In a real app, fetch from backend: const involvements = await fetch('/api/sso/recent-involvements');
+            const involvements = []; // Simulate empty or loading state
+
+            recentKillmailsSsoListEl.innerHTML = '';
+            if (currentMode !== 'sso' || !isLoggedIn || involvements.length === 0) {
+                recentKillmailsSsoListEl.innerHTML = '<p class="text-gray-400 p-2">No recent involvements found. (Backend would populate this)</p>';
+                return;
+            }
+            // ... (rendering logic)
+        }
+
+        async function displayUserKillActivity() { // Now async
+            killActivityListEl.innerHTML = '<p class="text-gray-400 text-center">Loading kill activity...</p>';
+            // In a real app: const userKills = await fetch('/api/sso/kill-activity');
+            const userKills = await simulateFetchUserKillActivity(); // Keep simulation for now, but it returns empty
+
+            killActivityListEl.innerHTML = '';
+            if (!isLoggedIn || userKills.length === 0) {
+                killActivityListEl.innerHTML = '<p class="text-gray-400 text-center">No recent kill activity found. (Backend would populate this)</p>';
+                return;
+            }
+             userKills.forEach(km => { // This loop won't run if userKills is empty
+                const itemDiv = document.createElement('div');
+                itemDiv.className = `kill-activity-item ${km.is_user_victim ? 'user-loss' : 'user-kill'}`;
+                // ... (rest of the rendering logic from previous version)
+                itemDiv.innerHTML = `
+                    <img src="${km.victim_ship_icon || 'https://placehold.co/48x48/718096/e2e8f0?text=?'}" alt="${km.victim_ship_name}" class="ship-icon-large">
+                    <div class="kill-activity-item-details">
+                        <p class="${km.is_user_victim ? 'victim' : ''}"><strong>Victim:</strong> ${km.victim_pilot_name} (${km.victim_corp_name || 'N/A'}) - ${km.victim_ship_name}</p>
+                        <p class="${!km.is_user_victim && km.user_involvement === 'Final Blow' ? 'aggressor' : ''}"><strong>Final Blow:</strong> ${km.final_blow_pilot_name} (${km.final_blow_ship_name})</p>
+                        <p><strong>System:</strong> ${km.system_name} @ ${new Date(km.killmail_time).toLocaleString()}</p>
+                        <p><strong>Value:</strong> ${formatISKValue(km.isk_value)}</p>
+                        <p><strong>User Involvement:</strong> ${km.user_involvement}</p>
+                    </div>
+                    <div class="kill-activity-item-actions place-self-center">
+                         <a href="https://zkillboard.com/kill/${km.killmail_id}/" target="_blank" rel="noopener noreferrer" class="btn btn-sm btn-secondary">View on zKillboard</a>
+                    </div>
+                `;
+                killActivityListEl.appendChild(itemDiv);
+            });
+        }
+
+
+        // --- Simulated EVE SSO & Backend Interactions ---
+        async function simulateFetchUserKillActivity() {
+            // This function would call your backend: GET /api/sso/kill-activity
+            // For now, it returns an empty array as mock data is removed.
+            await new Promise(resolve => setTimeout(resolve, 500)); // Simulate network delay
+            return []; 
+        }
+
+
+        async function handleLoginAttempt() {
+            loginSpinner.classList.remove('hidden');
+            loginBtn.disabled = true;
+            skipLoginBtn.disabled = true;
+            
+            // In a real app, this would redirect to your backend for OAuth flow.
+            // Your backend would then set a session/cookie.
+            await new Promise(resolve => setTimeout(resolve, 1500)); 
+
+            isLoggedIn = true; 
+            mockUserData = { // Keep basic user info simulation
+                characterId: 95465495, characterName: "Demo User",
+                corporationName: "Demo Corp Inc.", corporationId: 1000001,
+                allianceName: "Demo Alliance", allianceId: 500000
+            };
+            // No longer fetching mockUserKillActivity here, it will be fetched by displayUserKillActivity if needed.
+            
+            localStorage.setItem('isEveLoggedIn', 'true'); // Simulate session
+            localStorage.setItem('mockEveUser', JSON.stringify(mockUserData));
+
+            currentMode = 'initial'; 
+            updateUIForMode();
+
+            loginSpinner.classList.add('hidden');
+            loginBtn.disabled = false;
+            skipLoginBtn.disabled = false;
+        }
+
+        function handleSkipLogin() {
+            isLoggedIn = false;
+            mockUserData = null; 
+            currentMode = 'manual';
+            updateUIForMode();
+        }
+        
+        function handleLogoutAction() {
+            isLoggedIn = false;
+            mockUserData = null;
+            localStorage.removeItem('isEveLoggedIn');
+            localStorage.removeItem('mockEveUser');
+            localStorage.removeItem('mockUserKillActivity'); // Clear any potentially stored activity
+            selectedKillmailIdInput.value = '';
+            reportForm.reset();
+            currentMode = 'initial'; 
+            updateUIForMode();
+        }
+
+        async function handleViewPublicReport(reportId) { 
+            // This function would ideally fetch a specific public report from a backend
+            // For now, it will simulate creating report params and calling the backend simulator
+            // using the ID to potentially fetch a specific mock structure if we re-add them later.
+            // Since mockPublicReports is empty, this won't find anything.
+            showUINotification(errorNotification, "Viewing specific public reports requires backend data.");
+            reportOutputEl.innerHTML = '<p class="text-gray-400 p-4 text-center">Public report data would be loaded from a backend.</p>';
+            currentMode = 'viewing_public_report'; 
+            updateUIForMode(); 
+            reportOutputContainer.classList.remove('hidden');
+            reportOutputTitle.textContent = "Viewing Public Report";
+            dashboardBtnInOutput.classList.remove('hidden'); 
+        }
+
+        function displayGeneratedReport(reportData) {
+            // This function now expects reportData to come from the backend (simulated by fetchProcessedReportDataForBackend)
+            // It should be robust enough to handle missing pieces if the backend doesn't provide everything.
+            let friendlyShipsHTML = '';
+            if (reportData.friendly && reportData.friendly.ships && reportData.friendly.ships.length > 0) {
+                reportData.friendly.ships.forEach(s => {
+                    const statusHTML = s.status === "Destroyed" ? `<span class="status-text status-destroyed">${s.status}</span>` : `<span class="status-text status-survived">${s.status || ''}</span>`;
+                    const iskLostHTML = s.status === "Destroyed" ? `<span class="isk-lost destroyed">${formatISKValue(s.isk_lost)}</span>` : `<span class="isk-lost survived"> --- </span>`;
+                    friendlyShipsHTML += `
+                        <li class="ship-loss-item">
+                            <img src="${s.icon || 'https://placehold.co/32x32/718096/e2e8f0?text=S'}" alt="${s.ship_name}" class="ship-icon" onerror="this.style.display='none';">
+                            <div class="ship-main-info">
+                                <a href="https://zkillboard.com/kill/${s.killmail_id || 0}/" target="_blank" rel="noopener noreferrer" class="ship-name-link">${s.ship_name || 'Unknown Ship'}</a>
+                                <span class="pilot-name">${s.pilot_name || 'Unknown Pilot'}</span>
+                            </div>
+                            <div class="damage-info">
+                                <span>DD: ${formatDamage(s.damage_dealt)}</span>
+                                <span>DT: ${formatDamage(s.damage_taken)}</span>
+                            </div>
+                            ${iskLostHTML}
+                            ${statusHTML}
+                        </li>`;
+                });
+            } else {
+                friendlyShipsHTML = '<li>No specific friendly ship details available.</li>';
+            }
+
+
+            let enemyShipsHTML = '';
+             if (reportData.enemy && reportData.enemy.ships && reportData.enemy.ships.length > 0) {
+                reportData.enemy.ships.forEach(s => {
+                    const statusHTML = s.status === "Destroyed" ? `<span class="status-text status-destroyed">${s.status}</span>` : `<span class="status-text status-survived">${s.status || ''}</span>`;
+                    const iskLostHTML = s.status === "Destroyed" ? `<span class="isk-lost destroyed">${formatISKValue(s.isk_lost)}</span>` : `<span class="isk-lost survived"> --- </span>`;
+                    enemyShipsHTML += `
+                        <li class="ship-loss-item">
+                            <img src="${s.icon || 'https://placehold.co/32x32/718096/e2e8f0?text=S'}" alt="${s.ship_name}" class="ship-icon" onerror="this.style.display='none';">
+                            <div class="ship-main-info">
+                                <a href="https://zkillboard.com/kill/${s.killmail_id || 0}/" target="_blank" rel="noopener noreferrer" class="ship-name-link">${s.ship_name || 'Unknown Ship'}</a>
+                                <span class="pilot-name">${s.pilot_name || 'Unknown Pilot'}</span>
+                            </div>
+                             <div class="damage-info">
+                                <span>DD: ${formatDamage(s.damage_dealt)}</span>
+                                <span>DT: ${formatDamage(s.damage_taken)}</span>
+                            </div>
+                            ${iskLostHTML}
+                            ${statusHTML}
+                        </li>`;
+                });
+            } else {
+                enemyShipsHTML = '<li>No specific enemy ship details available.</li>';
+            }
+            
+            const friendlyEfficiencyLabel = reportData.friendly && reportData.friendly.name && reportData.friendly.name.includes("Side A") ? "Side A" : "Friendly";
+            const enemyEfficiencyLabel = reportData.enemy && reportData.enemy.name && reportData.enemy.name.includes("Side B") ? "Side B" : "Enemy";
+
+            let reportHTML = `
+                <h3>Report: ${reportData.reportTitle || "N/A"}</h3>
+                <p><strong>Battle Time:</strong> ${reportData.battleTime ? new Date(reportData.battleTime).toLocaleString() : "N/A"}</p>
+                <p><strong>System:</strong> ${reportData.systemName || "N/A"}</p>
+                ${reportData.narrative ? `<p><strong>Narrative/Summary:</strong><br>${reportData.narrative.replace(/\n/g, '<br>')}</p>` : ''}
+                <p><strong>Source:</strong> <a href="${reportData.originalLink || '#'}" target="_blank" rel="noopener noreferrer" class="text-blue-400 hover:text-blue-300 underline">${reportData.sourceReferenceDisplay || "N/A"}</a></p>
+
+                <div class="battle-stats">
+                    <h3>Battle Statistics</h3>
+                    <p><strong>Total ISK Value Destroyed:</strong> ${formatISKValue(reportData.totalValueDestroyed)}</p>
+                </div>
+                <div class="forces-container">
+                    <div class="${reportData.friendly ? reportData.friendly.sectionClass : 'section-neutral'}">
+                        <h3>${reportData.friendly ? reportData.friendly.name : 'Side A'}</h3>
+                        <p><strong>Pilots Involved (Estimate):</strong> ~${reportData.friendly ? reportData.friendly.pilots_involved_estimate : 'N/A'}</p>
+                        <p><strong>Total ISK Lost:</strong> ${formatISKValue(reportData.friendly ? reportData.friendly.total_isk_lost : 0)}</p>
+                        <p><strong>Efficiency:</strong> <span class="${reportData.efficiency >= 50 ? 'text-green-400' : 'text-red-400'}">${(reportData.efficiency || 0).toFixed(1)}%</span></p>
+                        <p><strong>Involved Ships:</strong></p>
+                        <ul>${friendlyShipsHTML}</ul>
+                    </div>
+
+                    <div class="${reportData.enemy ? reportData.enemy.sectionClass : 'section-neutral'}">
+                        <h3>${reportData.enemy ? reportData.enemy.name : 'Side B'}</h3>
+                        <p><strong>Pilots Involved (Estimate):</strong> ~${reportData.enemy ? reportData.enemy.pilots_involved_estimate : 'N/A'}</p>
+                        <p><strong>Total ISK Lost (Inflicted by ${friendlyEfficiencyLabel}):</strong> ${formatISKValue(reportData.enemy ? reportData.enemy.total_isk_lost : 0)}</p> 
+                        <p><strong>Efficiency:</strong> <span class="${reportData.enemyEfficiency >= 50 ? 'text-green-400' : 'text-red-400'}">${(reportData.enemyEfficiency || 0).toFixed(1)}%</span></p>
+                        <p><strong>Involved Ships:</strong></p>
+                        <ul>${enemyShipsHTML}</ul>
+                    </div>
+                </div>`;
+
+            if (reportData.keyEvents && reportData.keyEvents.length > 0) {
+                reportHTML += `<div class="section-neutral"><h3>Key Events</h3><ul>`;
+                reportData.keyEvents.forEach(event => reportHTML += `<li>${event}</li>`);
+                reportHTML += `</ul></div>`;
+            }
+            reportOutputEl.innerHTML = reportHTML;
+            reportOutputContainer.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+
+
+        async function fetchProcessedReportDataForBackend(reportParams) {
+            // This function now simulates a backend call that would return processed data.
+            // For a backend-ready shell, it should return a minimal or empty structure,
+            // or throw an error indicating data needs to come from a real backend.
+            await new Promise(resolve => setTimeout(resolve, 500)); 
+            
+            console.log("Simulating backend fetch with params:", reportParams);
+
+            // Placeholder: Return a very basic structure.
+            // A real backend would construct this based on ESI/ZKB data.
+            return {
+                reportTitle: reportParams.title || "Report (Data from Backend)",
+                narrative: reportParams.narrative || "Narrative would come from backend processing.",
+                sourceReferenceDisplay: "Data fetched via API",
+                originalLink: reportParams.manualZkbUrl || (reportParams.ssoDataSource === 'zkb_url_sso' ? reportParams.ssoReference : "#"),
+                battleTime: new Date().toISOString(),
+                systemName: reportParams.manualSystem || "Fetched System",
+                totalValueDestroyed: 0,
+                efficiency: 0,
+                enemyEfficiency: 0,
+                friendly: {
+                    name: isLoggedIn && mockUserData ? `${mockUserData.corporationName} & Allies` : "Side A",
+                    pilots_involved_estimate: 0,
+                    total_isk_lost: 0,
+                    ships: [], // Empty array, backend would fill this
+                    sectionClass: "section-friendly"
+                },
+                enemy: {
+                    name: "Opposing Forces",
+                    pilots_involved_estimate: 0,
+                    total_isk_lost: 0,
+                    ships: [], // Empty array, backend would fill this
+                    sectionClass: "section-enemy"
+                },
+                keyEvents: ["Key events would be determined by backend analysis."]
+            };
+        }
+
+        // --- Event Listeners ---
+        loginBtn.addEventListener('click', handleLoginAttempt);
+        skipLoginBtn.addEventListener('click', handleSkipLogin);
+        
+        navDashboardBtn.addEventListener('click', () => { currentMode = 'initial'; updateUIForMode(); });
+        navCreateSsoBtn.addEventListener('click', () => { currentMode = 'sso'; updateUIForMode(); });
+        navCreateManualBtn.addEventListener('click', () => { currentMode = 'manual'; updateUIForMode(); });
+        navKillActivityBtn.addEventListener('click', () => { currentMode = 'kill_activity'; updateUIForMode(); });
+        
+        const switchToManualBtn = document.getElementById('switchToManualBtnLoggedIn');
+        if (switchToManualBtn) {
+            switchToManualBtn.addEventListener('click', () => {
+                currentMode = 'manual'; 
+                updateUIForMode();
+            });
+        }
+
+
+        dashboardBtnInOutput.addEventListener('click', () => { 
+             currentMode = 'initial';
+             reportForm.reset(); 
+             selectedKillmailIdInput.value = ''; 
+             if (recentKillmailsSsoListEl) { 
+                 recentKillmailsSsoListEl.querySelectorAll('.killmail-item').forEach(el => el.classList.remove('selected'));
+             }
+             updateUIForMode();
+        });
+        
+        const userPanelBackBtn = document.getElementById('userPanelBackToDashboardBtn'); 
+        if(userPanelBackBtn) { 
+            userPanelBackBtn.addEventListener('click', () => {
+                currentMode = 'initial';
+                updateUIForMode();
+            });
+        }
+
+
+        logoutBtn.addEventListener('click', handleLogoutAction);
+        dataSourceSelect.addEventListener('change', toggleSsoDataSourceView); 
+
+        generateReportBtn.addEventListener('click', async () => {
+            if (!reportTitleInput.value.trim()) {
+                 showUINotification(errorNotification, 'Please enter a Report Title.');
+                 reportTitleInput.style.borderColor = '#f56565'; reportTitleInput.focus(); return;
+            }
+            reportTitleInput.style.borderColor = '#718096';
+
+            const reportParams = {
+                mode: (currentMode === 'viewing_public_report' || currentMode === 'manual') ? 'manual' : 'sso',
+                title: reportTitleInput.value,
+                narrative: reportNarrativeInput.value,
+            };
+
+            if (reportParams.mode === 'sso') { 
+                if (!isLoggedIn) { showUINotification(errorNotification, 'SSO error. Please try logging in again.'); return; }
+                reportParams.ssoDataSource = dataSourceSelect.value;
+                if (dataSourceSelect.value === 'recent_killmails') {
+                    if (!selectedKillmailIdInput.value) { showUINotification(errorNotification, 'Please select an ESI involvement.'); return; }
+                    reportParams.ssoReference = selectedKillmailIdInput.value;
+                } else { 
+                    if (!zkillUrlSsoInput.value.trim() || !zkillUrlSsoInput.checkValidity()) { 
+                        showUINotification(errorNotification, 'Please enter a valid zKillboard URL for SSO mode.'); 
+                        zkillUrlSsoInput.style.borderColor = '#f56565'; zkillUrlSsoInput.focus(); return; 
+                    }
+                    zkillUrlSsoInput.style.borderColor = '#718096';
+                    reportParams.ssoReference = zkillUrlSsoInput.value;
+                }
+            } else if (reportParams.mode === 'manual') { 
+                if (!manualSystemInput.value.trim()) { 
+                    showUINotification(errorNotification, 'Please enter System(s) for manual report.'); 
+                    manualSystemInput.style.borderColor = '#f56565'; manualSystemInput.focus(); return; 
+                }
+                manualSystemInput.style.borderColor = '#718096';
+                if (!manualDateInput.value) { 
+                    showUINotification(errorNotification, 'Please enter a Date for manual report.'); 
+                    manualDateInput.style.borderColor = '#f56565'; manualDateInput.focus(); return; 
+                }
+                manualDateInput.style.borderColor = '#718096';
+                 if (!manualTimeInput.value) { 
+                    showUINotification(errorNotification, 'Please enter a Time for manual report.'); 
+                    manualTimeInput.style.borderColor = '#f56565'; manualTimeInput.focus(); return; 
+                }
+                manualTimeInput.style.borderColor = '#718096';
+
+                reportParams.manualSystem = manualSystemInput.value;
+                reportParams.manualDate = manualDateInput.value;
+                reportParams.manualTime = manualTimeInput.value;
+                reportParams.manualZkbUrl = manualZkillUrlInput.value.trim() ? manualZkillUrlInput.value : null;
+                 if (reportParams.manualZkbUrl && !manualZkillUrlInput.checkValidity()) {
+                    showUINotification(errorNotification, 'The optional zKillboard URL is invalid.');
+                    manualZkillUrlInput.style.borderColor = '#f56565'; manualZkillUrlInput.focus(); return;
+                }
+                manualZkillUrlInput.style.borderColor = '#718096';
+            } else {
+                 showUINotification(errorNotification, 'Invalid application state. Please refresh.'); return;
+            }
+
+
+            generateSpinner.classList.remove('hidden');
+            generateReportBtn.disabled = true;
+            reportOutputEl.innerHTML = '<p class="text-gray-400 p-4 text-center">Generating report from backend...</p>';
+            reportOutputContainer.classList.remove('hidden');
+
+
+            try {
+                const reportData = await fetchProcessedReportDataForBackend(reportParams);
+                reportOutputTitle.textContent = "Generated Report";
+                displayGeneratedReport(reportData); 
+            } catch (error) {
+                console.error("Error generating report:", error);
+                showUINotification(errorNotification, `Error: ${error.message || "Could not generate report."}`);
+                reportOutputEl.innerHTML = '<p class="text-red-400 p-4 text-center">Error fetching report data from backend.</p>';
+            } finally {
+                generateSpinner.classList.add('hidden');
+                generateReportBtn.disabled = false;
+            }
+        });
+        
+        copyReportBtn.addEventListener('click', () => { 
+            if (reportOutputContainer.classList.contains('hidden') || !reportOutputEl.innerHTML.trim()) {
+                showUINotification(errorNotification, 'Please generate a report first.'); return;
+            }
+            const tempDiv = document.createElement('div'); tempDiv.innerHTML = reportOutputEl.innerHTML;
+            let plainText = "";
+            tempDiv.querySelectorAll('h3').forEach(h3 => plainText += `\n## ${h3.textContent.trim()} ##\n\n`);
+            tempDiv.querySelectorAll('p').forEach(p => {
+                let pText = p.innerHTML.replace(/<br\s*\/?>/gi, '\n').replace(/<strong>(.*?)<\/strong>/gi, '$1');
+                const stripper = document.createElement('div'); stripper.innerHTML = pText;
+                let textContent = (stripper.textContent || stripper.innerText || "").trim();
+                if (textContent) plainText += textContent + "\n";
+            });
+            tempDiv.querySelectorAll('.ship-loss-item').forEach(item => {
+                const shipNameLink = item.querySelector('.ship-name-link');
+                const shipName = shipNameLink?.textContent || 'Unknown Ship';
+                const zkbLink = shipNameLink?.href || 'No Link';
+                const pilotName = item.querySelector('.pilot-name')?.textContent || 'Unknown Pilot';
+                const iskLost = item.querySelector('.isk-lost')?.textContent || '0 ISK';
+                const status = item.querySelector('.status-text')?.textContent || 'Status Unknown'; 
+                const damageInfo = item.querySelector('.damage-info')?.textContent.replace(/\s+/g, ' ').trim() || 'DD: N/A, DT: N/A';
+                
+                plainText += `- ${shipName} (Pilot: ${pilotName}) - ${iskLost} - ${status} (${damageInfo}) [${zkbLink}]\n`;
+            });
+
+            tempDiv.querySelectorAll('ul:not(:has(li.ship-loss-item)) li').forEach(li => { 
+                let textContent = (li.textContent || "").trim(); if (textContent) plainText += `- ${textContent}\n`;
+            });
+            plainText = plainText.replace(/^\s*\n/gm, '').replace(/\n\s*\n\s*\n+/g, '\n\n');
+            navigator.clipboard.writeText(plainText.trim())
+                .then(() => showUINotification(copyNotification, 'Report copied to clipboard!'))
+                .catch(err => { console.error('Failed to copy: ', err); showUINotification(errorNotification, 'Failed to copy.'); });
+        });
+
+        resetFormBtn.addEventListener('click', () => {
+            const formWasForViewingPublicReport = reportOutputTitle.textContent === "Viewing Public Report";
+            
+            reportForm.reset();
+            reportOutputContainer.classList.add('hidden'); reportOutputEl.innerHTML = '';
+            selectedKillmailIdInput.value = '';
+            if (recentKillmailsSsoListEl) { 
+                 recentKillmailsSsoListEl.querySelectorAll('.killmail-item').forEach(el => el.classList.remove('selected'));
+            }
+            [reportTitleInput, zkillUrlSsoInput, manualSystemInput, manualDateInput, manualTimeInput, manualZkillUrlInput].forEach(input => {
+                if(input) input.style.borderColor = '#718096';
+            });
+
+            if (formWasForViewingPublicReport) { 
+                currentMode = 'initial';
+                updateUIForMode();
+            } else if (currentMode === 'sso') {
+                 toggleSsoDataSourceView();
+            } else if (currentMode === 'manual') { 
+                 manualDateInput.value = new Date().toISOString().split('T')[0];
+                 const now = new Date();
+                 manualTimeInput.value = `${String(now.getUTCHours()).padStart(2, '0')}:${String(now.getUTCMinutes()).padStart(2, '0')}`;
+            }
+        });
+        
+        // --- Initial Page Load Logic ---
+        (function initializeApp() {
+            const persistedLogin = localStorage.getItem('isEveLoggedIn');
+            const persistedUser = localStorage.getItem('mockEveUser');
+            // Removed loading of mockUserKillActivity from localStorage here,
+            // as it should be fetched on login or when navigating to the kill activity page.
+
+            if (persistedLogin === 'true' && persistedUser) {
+                isLoggedIn = true;
+                mockUserData = JSON.parse(persistedUser);
+                // mockUserKillActivity will be fetched by simulateFetchUserKillActivity if needed
+                currentMode = 'initial'; 
+            } else {
+                currentMode = 'initial';
+            }
+            updateUIForMode();
+        })();
+    }); 
+    </script>
+</body>
+</html>

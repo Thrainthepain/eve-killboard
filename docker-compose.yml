@@ -1,0 +1,38 @@
+version: '3.8'
+services:
+  backend:
+    build: .
+    ports:
+      - "5000:5000"
+    environment:
+      - NODE_ENV=production
+      - PORT=5000
+      - SESSION_SECRET=${SESSION_SECRET}
+      - EVE_CLIENT_ID=${EVE_CLIENT_ID}
+      - EVE_SECRET_KEY=${EVE_SECRET_KEY}
+      - EVE_CALLBACK_URL=${EVE_CALLBACK_URL}
+      - MONGO_URI=mongodb://mongo:27017/eve_reports
+      - REDIS_URL=redis://redis:6379
+    depends_on:
+      - mongo
+      - redis
+  frontend:
+    build:
+      context: ./frontend
+    ports:
+      - "80:80"
+    environment:
+      - REACT_APP_API_BASE=http://localhost:5000
+  mongo:
+    image: mongo:6.0
+    volumes:
+      - mongo-data:/data/db
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--requirepass", "${REDIS_PASSWORD}" ]
+    volumes:
+      - redis-data:/data
+
+volumes:
+  mongo-data:
+  redis-data:

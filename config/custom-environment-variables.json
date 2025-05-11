@@ -1,0 +1,12 @@
+{
+  "server": {
+    "port": "PORT",
+    "sessionSecret": "SESSION_SECRET",
+    "frontendUrl": "FRONTEND_URL"
+  },
+  "eve": {
+    "clientId": "EVE_CLIENT_ID",
+    "secretKey": "EVE_SECRET_KEY",
+    "callbackUrl": "EVE_CALLBACK_URL"
+  }
+}
