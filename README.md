@@ -58,7 +58,7 @@ React │   │ REST API        │   │ Bull Queue
 
 ```bash
 # 1. Clone repo
-git clone https://github.com/Thrainthepain/eve-killboard.git
+git clone https://github.com/Thrainthepain/eve-report-generator.git
 cd eve-report-generator
 
 # 2. Generate .env interactively
