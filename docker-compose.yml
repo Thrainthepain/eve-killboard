@@ -1,5 +1,16 @@
 version: '3.8'
 services:
+    worker:
+    build: .
+    command: node workers/zkbWorker.js
+    environment:
+      - NODE_ENV=production
+      - MONGO_URI=mongodb://mongo:27017/eve_reports
+      - REDIS_URL=redis://redis:6379
+    depends_on:
+      - mongo
+      - redis
+
   backend:
     build: .
     ports:

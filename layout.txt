@@ -1,35 +1,54 @@
 project-root/
 │
-├── frontend/                   # React app
-│   ├── public/
-│   │   └── index.html
-│   ├── src/
-│   │   ├── index.js
-│   │   ├── App.js
-│   │   └── pages/
-│   │       ├── Login.js
-│   │       └── Dashboard.js
-│   └── package.json
+├─ ⚙  .env.example
+├─ ⚙  .eslintrc.js
+├─ ⚙  .github/
+│   └─ workflows/
+│       └─ ci.yml
 │
-├── config/                     # Config & env templates
-│   ├── default.json
-│   ├── custom-environment-variables.json
-│   └── .env.example
+├─ 🐳 Dockerfile                (backend)
+├─ 🐳 docker-compose.yml
+├─ 🐳 frontend/
+│   └─ Dockerfile              (frontend build + Nginx)
 │
-├── routes/                     # Express route handlers
-│   ├── auth.js
-│   ├── user.js
-│   └── reports.js
+├─ 📦 server.js                 (Express entry with Sentry, Redis, Mongo, Helmet, rate‑limit)
+├─ 📦 package.json              (backend scripts & deps)
+├─ 📝 README / Deployment canvas (contains setup‑env.sh, docker docs)
 │
-├── services/                   # Business logic & API integrations
-│   ├── esiService.js
-│   ├── zkbService.js
-│   └── reportProcessorService.js
+├─ config/
+│   ├─ default.json
+│   └─ custom-environment-variables.json
 │
-├── middleware/                 # Custom Express middleware
-│   └── authMiddleware.js
+├─ routes/
+│   ├─ auth.js
+│   ├─ user.js
+│   └─ reports.js
 │
-├── server.js                   # Main backend entrypoint
-├── package.json                # Backend dependencies & scripts
-├── .gitignore
-└── README.md                   # (optional) project overview, setup instructions
+├─ services/
+│   ├─ esiService.js
+│   ├─ zkbService.js
+│   └─ reportProcessorService.js
+│
+├─ models/
+│   └─ report.js
+│
+├─ middleware/
+│   └─ authMiddleware.js
+│
+├─ workers/
+│   └─ zkbWorker.js             (Bull queue worker)
+│
+├─ tests/
+│   └─ reportProcessorService.test.js
+│
+└─ frontend/                    (React app)
+    ├─ package.json
+    ├─ .eslintrc.js
+    ├─ public/
+    │   └─ index.html
+    └─ src/
+        ├─ index.js
+        ├─ App.js
+        └─ pages/
+            ├─ Login.js
+            └─ Dashboard.js
