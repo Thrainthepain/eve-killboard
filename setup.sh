@@ -55,11 +55,9 @@ echo
 #───────────────────────────────────────────────────────────
 PORT=$(prompt "PORT" "5000")
 FRONTEND_URL=$(prompt "FRONTEND_URL" "http://localhost")
-API_BASE_URL=$(prompt "API_BASE_URL (for frontend)" "http://localhost:${PORT}")
 EVE_CLIENT_ID=$(prompt "EVE_CLIENT_ID" "your_eve_client_id")
 EVE_SECRET_KEY=$(prompt "EVE_SECRET_KEY" "your_eve_secret_key")
-EVE_CALLBACK_URL=$(prompt "EVE_CALLBACK_URL" "${API_BASE_URL}/auth/eve/callback")
-COMPOSE_PROJECT_NAME=$(prompt "COMPOSE_PROJECT_NAME" "eve-report")
+EVE_CALLBACK_URL=$(prompt "EVE_CALLBACK_URL" "http://localhost:${PORT}/auth/eve/callback")
 
 # CI/CD secrets — leave blank if not using
 HEROKU_API_KEY=$(prompt "HEROKU_API_KEY" "")
@@ -74,14 +72,10 @@ SENTRY_DSN=$(prompt "SENTRY_DSN" "$SENTRY_DSN")
 # 5. Write the .env file
 #───────────────────────────────────────────────────────────
 cat > .env <<EOF
-# ─── Docker Compose Project Name ───────────────────────────
-COMPOSE_PROJECT_NAME=$COMPOSE_PROJECT_NAME
-
 # ─── Backend ───────────────────────────────────────────────
 PORT=$PORT
 SESSION_SECRET=$SESSION_SECRET
 FRONTEND_URL=$FRONTEND_URL
-API_BASE_URL=$API_BASE_URL
 EVE_CLIENT_ID=$EVE_CLIENT_ID
 EVE_SECRET_KEY=$EVE_SECRET_KEY
 EVE_CALLBACK_URL=$EVE_CALLBACK_URL
@@ -107,94 +101,115 @@ echo "• REDIS_URL includes a random password."
 echo "Edit the file if you need to change anything."
 
 #───────────────────────────────────────────────────────────
-# 6. Create start script
+# 6. Create Docker Compose file with proper configuration
 #───────────────────────────────────────────────────────────
-cat > start-containers.sh <<EOF
+cat > docker-compose.yml <<EOF
+version: '3.8'
+
+services:
+  backend:
+    build: .
+    container_name: eve-backend
+    ports:
+      - "${PORT}:${PORT}"
+    environment:
+      NODE_ENV: production
+      PORT: ${PORT}
+      SESSION_SECRET: \${SESSION_SECRET}
+      EVE_CLIENT_ID: \${EVE_CLIENT_ID}
+      EVE_SECRET_KEY: \${EVE_SECRET_KEY}
+      EVE_CALLBACK_URL: \${EVE_CALLBACK_URL}
+      FRONTEND_URL: \${FRONTEND_URL}
+      MONGO_URI: \${MONGO_URI}
+      REDIS_URL: \${REDIS_URL}
+      SENTRY_DSN: \${SENTRY_DSN}
+    depends_on:
+      - mongo
+      - redis
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:${PORT}/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  worker:
+    build: .
+    container_name: eve-worker
+    command: node workers/zkbWorker.js
+    environment:
+      NODE_ENV: production
+      MONGO_URI: \${MONGO_URI}
+      REDIS_URL: \${REDIS_URL}
+      SENTRY_DSN: \${SENTRY_DSN}
+    depends_on:
+      - mongo
+      - redis
+
+  frontend:
+    build:
+      context: ./frontend
+    container_name: eve-frontend
+    ports:
+      - "80:80"
+    environment:
+      REACT_APP_API_BASE: http://backend:${PORT}
+    depends_on:
+      - backend
+
+  mongo:
+    image: mongo:6.0
+    container_name: eve-mongo
+    volumes:
+      - mongo-data:/data/db
+    healthcheck:
+      test: echo 'db.runCommand("ping").ok' | mongo localhost:27017/${DB_NAME} --quiet
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  redis:
+    image: redis:7-alpine
+    container_name: eve-redis
+    command: ["redis-server", "--requirepass", "\${REDIS_PASSWORD}"]
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "\${REDIS_PASSWORD}", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+volumes:
+  mongo-data:
+  redis-data:
+EOF
+
+echo -e "\n✅  docker-compose.yml generated successfully!"
+
+#───────────────────────────────────────────────────────────
+# 7. Create Docker start script
+#───────────────────────────────────────────────────────────
+cat > start-docker.sh <<EOF
 #!/usr/bin/env bash
 set -e
 
 # Check if .env file exists
 if [ ! -f .env ]; then
-  echo "⚠️  .env file not found. Please run ./setup-env.sh first."
+  echo "⚠️  .env file not found. Please run ./setup.sh first."
   exit 1
 fi
 
-# Pull latest images (optional)
-read -p "Pull latest Docker images before starting? (y/N): " pull
-if [[ "\$pull" =~ ^[Yy] ]]; then
-  echo "Pulling latest Docker images..."
-  docker-compose pull
-fi
+# Source the .env file to get variables
+source .env
 
-# Build and start services
-echo "🚀 Building and starting Docker containers..."
-docker-compose up -d --build
-
-# Show running containers
-echo ""
-docker-compose ps
-
-echo ""
-echo "🎉 Services are running!"
-echo "• Frontend: http://localhost"
-echo "• Backend API: http://localhost:${PORT}"
-echo "• API Docs: http://localhost:${PORT}/api/docs (if enabled)"
-echo ""
-echo "To view logs: docker-compose logs -f"
-echo "To stop: docker-compose down"
+# Run docker-compose with the environment variables
+echo "🚀 Starting Docker containers..."
+docker-compose up \$@
 EOF
 
-chmod +x start-containers.sh
+chmod +x start-docker.sh
 
-#───────────────────────────────────────────────────────────
-# 7. Create nginx.conf for frontend (if it doesn't exist)
-#───────────────────────────────────────────────────────────
-mkdir -p ./frontend
-if [ ! -f ./frontend/nginx.conf ]; then
-  cat > ./frontend/nginx.conf <<EOF
-server {
-    listen 80;
-    server_name localhost;
-    
-    location / {
-        root /usr/share/nginx/html;
-        index index.html;
-        try_files \$uri \$uri/ /index.html;
-    }
-
-    # Forward API requests to backend if needed
-    # location /api {
-    #     proxy_pass http://backend:${PORT};
-    #     proxy_set_header Host \$host;
-    #     proxy_set_header X-Real-IP \$remote_addr;
-    # }
-
-    # Additional security headers
-    add_header X-Frame-Options "SAMEORIGIN";
-    add_header X-Content-Type-Options "nosniff";
-    add_header X-XSS-Protection "1; mode=block";
-}
-EOF
-  echo "✅  Created nginx.conf for the frontend container"
-fi
-
-#───────────────────────────────────────────────────────────
-# 8. Create .dockerignore file (if it doesn't exist)
-#───────────────────────────────────────────────────────────
-if [ ! -f ./.dockerignore ]; then
-  cat > ./.dockerignore <<EOF
-.git
-node_modules
-npm-debug.log
-.env
-.env.*
-*.md
-.gitignore
-.dockerignore
-docker-compose*
-EOF
-  echo "✅  Created .dockerignore file"
-fi
-
-echo -e "\n🎉 Setup complete! To start your containers, run:"
-echo "   ./start-containers.sh"
+echo -e "\n✅  start-docker.sh script generated successfully!"
+echo -e "\n🎉 Setup complete! Now you can run:"
+echo -e "   ./start-docker.sh        # Run in foreground"
+echo -e "   ./start-docker.sh -d     # Run in detached mode"
