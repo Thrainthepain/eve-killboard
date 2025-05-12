@@ -3,6 +3,7 @@ version: '3.8'
 services:
   backend:
     build: .
+    container_name: eve-backend
     ports:
       - "5000:5000"
     environment:
@@ -13,18 +14,24 @@ services:
       EVE_SECRET_KEY: ${EVE_SECRET_KEY}
       EVE_CALLBACK_URL: ${EVE_CALLBACK_URL}
       MONGO_URI: mongodb://mongo:27017/eve_reports
-      REDIS_URL: redis://redis:6379
+      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379
     depends_on:
       - mongo
       - redis
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
   worker:
     build: .
+    container_name: eve-worker
     command: node workers/zkbWorker.js
     environment:
       NODE_ENV: production
       MONGO_URI: mongodb://mongo:27017/eve_reports
-      REDIS_URL: redis://redis:6379
+      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379
     depends_on:
       - mongo
       - redis
@@ -32,21 +39,36 @@ services:
   frontend:
     build:
       context: ./frontend
+    container_name: eve-frontend
     ports:
       - "80:80"
     environment:
-      REACT_APP_API_BASE: http://localhost:5000
+      REACT_APP_API_BASE: http://backend:5000
+    depends_on:
+      - backend
 
   mongo:
     image: mongo:6.0
+    container_name: eve-mongo
     volumes:
       - mongo-data:/data/db
+    healthcheck:
+      test: echo 'db.runCommand("ping").ok' | mongo localhost:27017/eve_reports --quiet
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
   redis:
     image: redis:7-alpine
+    container_name: eve-redis
     command: ["redis-server", "--requirepass", "${REDIS_PASSWORD}"]
     volumes:
       - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
 volumes:
   mongo-data:
